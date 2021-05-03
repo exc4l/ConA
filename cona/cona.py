@@ -3,19 +3,25 @@ from sys import argv
 import subprocess
 import json
 import srt
+
 # import os
 import re
+
 # a = Path(argv[1])
 # print(a.absolute())
 def remove_names(text):
     return re.sub(r"\（(.*?)\）", "", text)
+
+
 def tryint(s):
     try:
         return int(s)
     except:
         return s
+
+
 def alphanum_key(s):
-    return [ tryint(c) for c in re.split('([0-9]+)', s.name) ]
+    return [tryint(c) for c in re.split("([0-9]+)", s.name)]
 
 
 class VideoClips:
@@ -26,20 +32,32 @@ class VideoClips:
         self.videofile = videofile
         self.line_padding = padding
         self.intervals = []
-        self.duration = float(json.loads(subprocess.check_output([
-            'ffprobe',
-            '-v', 'quiet',
-            '-print_format', 'json',
-            '-show_entries', 'format=duration',
-            self.videofile]))['format']['duration'])
+        self.duration = float(
+            json.loads(
+                subprocess.check_output(
+                    [
+                        "ffprobe",
+                        "-v",
+                        "quiet",
+                        "-print_format",
+                        "json",
+                        "-show_entries",
+                        "format=duration",
+                        self.videofile,
+                    ]
+                )
+            )["format"]["duration"]
+        )
 
     def add_clip(self, start, end):
         if start > self.duration:
             return
-        self.intervals.append([
-            max(0, start - self.line_padding),
-            min(self.duration, end + self.line_padding)
-        ])
+        self.intervals.append(
+            [
+                max(0, start - self.line_padding),
+                min(self.duration, end + self.line_padding),
+            ]
+        )
 
     def _get_merged_intervals(self):
         self.intervals.sort()
@@ -56,13 +74,21 @@ class VideoClips:
             return
 
         index = VideoClips.INDEX
-        vid_json = json.loads(subprocess.check_output([
-            'ffprobe.exe',
-            '-v', 'quiet',
-            '-print_format', 'json',
-            '-show_streams',
-            '-select_streams', 'a',
-            self.videofile]))
+        vid_json = json.loads(
+            subprocess.check_output(
+                [
+                    "ffprobe.exe",
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
+                    "-show_streams",
+                    "-select_streams",
+                    "a",
+                    self.videofile,
+                ]
+            )
+        )
         all_streams = {s["index"]: s for s in vid_json["streams"]}
         if index not in all_streams:
             index = None
@@ -74,9 +100,9 @@ class VideoClips:
             else:
                 print("[id]: Tag Information")
                 for s in vid_json["streams"]:
-                    tags = 'Unknown'
+                    tags = "Unknown"
                     try:
-                        tags = str(s['tags'])
+                        tags = str(s["tags"])
                     except:
                         pass
                     print(f"[{s['index']}]:\n{tags}\n")
@@ -93,17 +119,25 @@ class VideoClips:
             outfile = f"{self.videofile.stem}-{start},{end}.opus"
             # outfile = f'{os.path.splitext(os.path.basename(self.videofile))[0]}-{start},{end}.opus'
             outfile = tmpoutdir / outfile
-            subprocess.check_output([
-                'ffmpeg', '-y',
-                '-ss', str(start),
-                '-to', str(end),
-                '-i', self.videofile,
-                '-map', f'0:{index}',
-                outfile])
+            subprocess.check_output(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-ss",
+                    str(start),
+                    "-to",
+                    str(end),
+                    "-i",
+                    self.videofile,
+                    "-map",
+                    f"0:{index}",
+                    outfile,
+                ]
+            )
 
     @classmethod
     def final_export(cls, dirname):
-        tmpoutdir = dirname/"_tmp_audio"
+        tmpoutdir = dirname / "_tmp_audio"
         outdir = dirname
         # if not os.path.isdir(outdir):
         #     os.mkdir(outdir)
@@ -129,20 +163,28 @@ class VideoClips:
             # all_files = sorted([a for a in os.listdir(tmpoutdir) if a.endswith('.opus')], key=alphanum_key)
             all_files = sorted(list(tmpoutdir.glob("*.opus")), key=alphanum_key)
             for filename in all_files:
-                episodes.add('-'.join(filename.name.split('-')[:-1]))
+                episodes.add("-".join(filename.name.split("-")[:-1]))
             for ep in episodes:
-                with open(list_file, 'w', encoding='utf-8') as lf:
+                with open(list_file, "w", encoding="utf-8") as lf:
                     for f in all_files:
                         if ep in f.name:
                             lf.write(f"file '{f}'\n")
-                outfile = outdir / f'{ep}.opus'
-                subprocess.check_output([
-                    'ffmpeg', '-y',
-                    '-f', 'concat',
-                    '-safe', '0',
-                    '-i', list_file,
-                    '-c', 'copy',
-                    outfile])
+                outfile = outdir / f"{ep}.opus"
+                subprocess.check_output(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-f",
+                        "concat",
+                        "-safe",
+                        "0",
+                        "-i",
+                        list_file,
+                        "-c",
+                        "copy",
+                        outfile,
+                    ]
+                )
 
         else:
             os.rename(tmpoutdir, outdir)
@@ -165,7 +207,7 @@ def main():
     print(subs)
     for vid, sub in zip(vids, subs):
         v = VideoClips(vid)
-        with open(sub, "r", encoding='utf-8') as file:
+        with open(sub, "r", encoding="utf-8") as file:
             subgen = list(srt.parse(file.read()))
         for line in subgen:
             if "♪" in line.content:
@@ -177,6 +219,7 @@ def main():
             v.add_clip(line.start.total_seconds(), line.end.total_seconds())
         v.export()
     VideoClips.final_export(foldpath)
-if __name__ == '__main__':
-    main()
 
+
+if __name__ == "__main__":
+    main()
